@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>iBooth Pro | Triple Filter Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-url: url('https://files.catbox.moe/q3lcv3.jpeg');
+            --ios-blur: blur(50px) saturate(180%);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: 'Plus Jakarta Sans', sans-serif; color: white; overflow: hidden; background: #000; }
+
+        .master-bg { position: fixed; inset: 0; background: var(--bg-url) center/cover no-repeat; z-index: 1; }
+        .glass-layer { position: fixed; inset: 0; backdrop-filter: var(--ios-blur); -webkit-backdrop-filter: var(--ios-blur); background: rgba(0, 0, 0, 0.3); z-index: 2; }
+
+        .app-content { position: relative; z-index: 10; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 40px 20px; }
+
+        /* Camera Viewport */
+        .camera-container {
+            width: 100%; max-width: 340px; aspect-ratio: 1/1;
+            background: rgba(0,0,0,0.5); border-radius: 45px; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.15); position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); transition: filter 0.3s ease; }
+        
+        /* Definisi Filter Rona & Retro */
+        .f-bw { filter: grayscale(100%) contrast(1.3) brightness(1.1) scaleX(-1); }
+        .f-rona { filter: saturate(1.6) contrast(1.1) brightness(1.05) scaleX(-1); }
+        .f-retro { filter: sepia(0.4) saturate(1.2) contrast(0.9) brightness(1.1) scaleX(-1); }
+
+        /* Filter Switcher */
+        .filter-dock {
+            display: flex; gap: 8px; background: rgba(255,255,255,0.1);
+            padding: 5px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 15px;
+        }
+        .filter-opt {
+            padding: 8px 18px; border-radius: 20px; font-size: 0.6rem; font-weight: 800;
+            cursor: pointer; transition: 0.3s; color: rgba(255,255,255,0.5); border: none; background: none;
+        }
+        .filter-opt.active { background: white; color: black; box-shadow: 0 5px 15px rgba(255,255,255,0.2); }
+
+        /* Shutter */
+        .shutter-ring { width: 80px; height: 80px; border-radius: 50%; border: 4px solid white; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        .shutter-ball { width: 62px; height: 62px; border-radius: 50%; background: white; }
+
+        /* Modal Hasil */
+        #result-modal {
+            position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column; 
+            align-items: center; justify-content: center; backdrop-filter: blur(60px) brightness(0.8);
+            -webkit-backdrop-filter: blur(60px) brightness(0.8); animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .main-preview-layout { display: flex; align-items: center; gap: 15px; }
+        .frame-picker { display: flex; flex-direction: column; gap: 12px; }
+        .color-dot { width: 30px; height: 30px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.2); cursor: pointer; }
+
+        .scroll-frame {
+            width: 170px; height: 420px; overflow-y: auto; scroll-behavior: smooth; 
+            border-radius: 12px; padding: 10px; background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1); scrollbar-width: none;
+        }
+        .scroll-frame::-webkit-scrollbar { display: none; }
+
+        .polaroid-strip { width: 100%; background: white; padding: 10px; display: flex; flex-direction: column; gap: 8px; transition: 0.3s; }
+        .polaroid-strip img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+
+        .nav-aside { display: flex; flex-direction: column; gap: 12px; }
+        .nav-btn { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: white; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+        .btn-save { background: white; color: black; border: none; padding: 18px 60px; border-radius: 40px; font-weight: 800; margin-top: 35px; cursor: pointer; }
+
+        #flash { position: fixed; inset: 0; background: white; opacity: 0; z-index: 999; pointer-events: none; }
+        #count { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; font-size: 7rem; font-weight: 800; text-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div class="master-bg"></div>
+<div class="glass-layer"></div>
+<div id="flash"></div>
+
+<div class="app-content">
+    <div style="font-size: 0.6rem; font-weight: 800; letter-spacing: 5px; opacity: 0.5;">iBOOTH PRO CAMERA</div>
+
+    <div class="camera-container">
+        <video id="v" autoplay playsinline class="f-bw"></video>
+        <div id="count"></div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center;">
+        <div class="filter-dock">
+            <button class="filter-opt active" onclick="setFilter('f-bw', this)">BW</button>
+            <button class="filter-opt" onclick="setFilter('f-rona', this)">RONA</button>
+            <button class="filter-opt" onclick="setFilter('f-retro', this)">RETRO</button>
+        </div>
+
+        <div class="shutter-ring" onclick="startBooth()">
+            <div class="shutter-ball"></div>
+        </div>
+    </div>
+</div>
+
+<div id="result-modal">
+    <div class="main-preview-layout">
+        <div class="frame-picker">
+            <div class="color-dot" style="background: #007AFF;" onclick="changeColor('#007AFF')"></div>
+            <div class="color-dot" style="background: #000000;" onclick="changeColor('#000000')"></div>
+            <div class="color-dot" style="background: #FFFFFF;" onclick="changeColor('#FFFFFF')"></div>
+        </div>
+
+        <div class="scroll-frame" id="scroller">
+            <div class="polaroid-strip" id="strip"></div>
+        </div>
+
+        <div class="nav-aside">
+            <div class="nav-btn" onclick="scroller.scrollTop -= 150">↑</div>
+            <div class="nav-btn" onclick="scroller.scrollTop += 150">↓</div>
+        </div>
+    </div>
+    <button class="btn-save" onclick="download()">SAVE COLLECTION</button>
+    <button onclick="location.reload()" style="background:none; border:none; color:white; margin-top:20px; font-size:0.6rem; opacity:0.4;">RETAKE SESSION</button>
+</div>
+
+<canvas id="hiddenCanvas" style="display:none"></canvas>
+
+<script>
+    const v = document.getElementById('v');
+    const countEl = document.getElementById('count');
+    const strip = document.getElementById('strip');
+    const scroller = document.getElementById('scroller');
+    let photos = [];
+    let currentFilter = 'f-bw';
+    let currentFrame = '#FFFFFF';
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }).then(s => v.srcObject = s);
+
+    function setFilter(f, btn) {
+        document.querySelectorAll('.filter-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        v.className = f;
+        currentFilter = f;
+    }
+
+    function changeColor(c) {
+        currentFrame = c;
+        strip.style.background = c;
+    }
+
+    async function startBooth() {
+        document.querySelector('.shutter-ring').style.pointerEvents = 'none';
+        photos = []; strip.innerHTML = '';
+        for(let i=0; i<4; i++) {
+            for(let c=3; c>0; c--) {
+                countEl.innerText = c;
+                await new Promise(r => setTimeout(r, 800));
+            }
+            countEl.innerText = '';
+            document.getElementById('flash').style.opacity = 1;
+            setTimeout(() => document.getElementById('flash').style.opacity = 0, 100);
+            snap();
+            await new Promise(r => setTimeout(r, 500));
+        }
+        document.getElementById('result-modal').style.display = 'flex';
+    }
+
+    function snap() {
+        const can = document.getElementById('hiddenCanvas');
+        const ctx = can.getContext('2d');
+        can.width = 1000; can.height = 1000;
+        
+        // Render filter ke canvas
+        if(currentFilter === 'f-bw') ctx.filter = 'grayscale(100%) contrast(1.3) brightness(1.1)';
+        if(currentFilter === 'f-rona') ctx.filter = 'saturate(1.6) contrast(1.1)';
+        if(currentFilter === 'f-retro') ctx.filter = 'sepia(0.4) saturate(1.2) contrast(0.9)';
+        
+        ctx.translate(1000, 0); ctx.scale(-1, 1);
+        ctx.drawImage(v, 0, 0, 1000, 1000);
+        const data = can.toDataURL('image/jpeg', 0.95);
+        photos.push(data);
+        const img = document.createElement('img');
+        img.src = data;
+        strip.appendChild(img);
+    }
+
+    function download() {
+        const final = document.createElement('canvas');
+        const fctx = final.getContext('2d');
+        final.width = 800; final.height = 3150;
+        fctx.fillStyle = currentFrame;
+        fctx.fillRect(0, 0, 800, 3150);
+        let loaded = 0;
+        photos.forEach((src, i) => {
+            const img = new Image();
+            img.src = src;
+            img.onload = () => {
+                fctx.drawImage(img, 50, 50 + (i * 740), 700, 700);
+                loaded++;
+                if(loaded === 4) {
+                    fctx.fillStyle = (currentFrame === '#FFFFFF') ? '#333' : '#FFF';
+                    fctx.font = "bold 35px sans-serif";
+                    fctx.textAlign = "center";
+                    fctx.fillText("iBOOTH PRO STRIP", 400, 3080);
+                    const a = document.createElement('a');
+                    a.download = 'iboot-strip.jpg';
+                    a.href = final.toDataURL('image/jpeg', 1.0);
+                    a.click();
+                }
+            };
+        });
+    }
+</script>
+</body>
+</html>
